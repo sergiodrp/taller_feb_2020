@@ -1,0 +1,88 @@
+---
+- hosts: linux
+  remote_user: admin
+  become: yes
+  vars_files:
+  - "./variables.yml"
+
+  tasks:
+  - name: Verifico si el repositorio EPEL esta instalado. O no.
+    yum: 
+      name: epel-release
+      state: present
+
+  - name: Instalo paquetes del listado packages ATR.
+    yum:
+      name: "{{ packages }}"
+      state: latest
+ 
+  - name: Configuro postfix, viteh.
+    template:
+      src: ./postfix-main.j2
+      dest: /etc/postfix-main.cf
+      mode: 0640
+      owner: root
+      group: root
+    notify: Reiniciar postfix
+
+  - name: Postfix se ejecuta y queda habilitado. Ta pelao.
+    service:
+      name: postfix
+      state: started
+      enabled: yes
+
+  - name: Configuro archivo principal de dovecot
+    lineinfile:
+      path: /etc/dovecot/dovecot.conf
+      line: 'protocols= imap pop3 lmtp'
+    notify: Reiniciar dovecot
+
+  - name: Copio configurcion de mail de dovecot
+    copy:
+      src: ./10-mail.conf
+      dest: /etc/dovecot/conf.d/10-mail.conf
+      mode: 0640
+      owner: root
+      group: root
+    notify: Reiniciar dovecot
+
+  - name: Dovecut se ejecuta y queda habilitado
+    service:
+      name: dovecot
+      state: started
+      enabled: yes
+
+  - name: Configuro squirrelmail
+    template:
+      src: ./squirrelmail.conf.j2
+      dest: /etc/squirrelmail/config.php
+
+  - name: Apache se ejecuta y queda habilitado
+    service:
+      name: httpd
+      state: started
+      enabled: yes
+
+  - name: Abro los puertos en el firewall .
+    firewalld:
+      service: "{{ item }}"
+      state: enabled
+      permanent: yes
+      immediate: yes
+    loop:
+    - smtp
+    - http
+    - imap
+    - pop3
+
+
+  handlers:
+  - name: Reiniciar postfix
+    service:
+      name: postfix
+      state: restarted
+
+  - name: Reiniciar dovecot
+    service:
+      name: dovecot
+      state: restarted
