@@ -1,0 +1,58 @@
+---
+- hosts: linux
+  remote_user: ansible
+  become: yes
+  vars_files:
+  - "./variables.yml"
+
+  tasks:
+  - name: Verifico si el repositorio EPEL esta instalado.
+    yum: 
+      name: epel-release
+      state: present
+
+  - name: Instalo paquetes del listado packages.
+    yum:
+      name: "{{ packages }}"
+      state: latest
+ 
+  - name: Apache se ejecuta y se habilita.
+    service:
+      name: httpd
+      state: started
+      enabled: yes 
+  
+  - name: Genero virtualhost desde template.
+    template:
+      src: ./vhost_template.j2
+      dest: /etc/httpd/vhost.d
+      mode: 0640
+      owner: root
+      group: root
+    notify: Reiniciar apache
+
+  - name: Copio index.html
+    copy:
+	 src: ./index.html
+	 dest: ¿documentroot?
+	 mode: 0640
+	 owner: root
+	 group: root
+	notify: ¿Reiniciar apache?
+
+  - name: Abro los puertos en el firewall .
+    firewalld:
+      service: "{{ item }}"
+      state: enabled
+      permanent: yes
+      immediate: yes
+    loop:
+    - https
+    - http
+
+
+  handlers:
+  - name: Reiniciar apache
+    service:
+      name: httpd
+      state: restarted
